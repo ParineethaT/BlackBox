@@ -24,11 +24,15 @@ def attr_key(l):
 """
 	Assuming input file(s) to be tsv, and first field to be object and rest of the fields as attributes 
 """
+#Read input
 inRDD = sc.textFile(sys.argv[1])
+
 ##Generating attribute-object pair from each line
 pairRDD = inRDD.flatMap(lambda line: attr_key(line.split("\t")))
+
 ##Converting to Row objects
 aoPair = pairRDD.map(lambda (a, o): Row(attr=a, obj=o))
+
 ##Converting to Dataframe
 
 """
@@ -44,10 +48,11 @@ aoPair = pairRDD.map(lambda (a, o): Row(attr=a, obj=o))
 
 aoDF = sqlCtx.createDataFrame(aoPair)
 
-#Window definition
-window = Window.oederBy("attr").partitionBy("obj")
+#Window that moves over rows of same obj and sorted by attr
 
-##
+window = Window.orderBy("attr").partitionBy("obj")
+
+## Prev column contains previous attr of the same object
 """
 	Transformed Table	
 	+----+---+----+
