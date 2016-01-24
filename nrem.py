@@ -2,10 +2,11 @@
 
 import sys
 from pyspark import SparkConf, SparkContext
-from pyspark.sql import SQLContext, Row, Window
+from pyspark.sql import HiveContext, Row, Window
 from pyspark.sql.functions import *
 
 if len(sys.argv) != 3:
+	
 	print(""" 
 		Error: This program takes 2 arguments
 		Usage: bin/spark-submit --master <spark-master> nrem.py <input dir> <output dir>
@@ -14,7 +15,7 @@ if len(sys.argv) != 3:
 
 conf = SparkConf().setAppName("Non Redundant Entity Matching")
 sc = SparkContext(conf=conf)
-sqlCtx = SQLContext(sc)
+sqlCtx = HiveContext(sc)
 
 def attr_key(l):
 	"""
@@ -67,7 +68,9 @@ window = Window.orderBy("attr").partitionBy("obj")
 	|   1|  y|null|
 	+----+---+----+
 """
-memorize = aoDF.select("attr", "obj", lag("attr",1, None).over(window).alias("prev"))
+memorize = aoDF.select("attr", "obj", lag("attr",1, None).over(window).alias("prev")).cache()
+
+
 
 
 
