@@ -5,7 +5,11 @@ from pyspark import SparkConf, SparkContext
 from pyspark.sql import SQLContext, Row, Window
 from pyspark.sql.functions import *
 
-if len(sys.argv) != 2:
+if len(sys.argv) != 3:
+	print(""" 
+		Error: This program takes 2 arguments
+		Usage: bin/spark-submit --master <spark-master> nrem.py <input dir> <output dir>
+	""")
 	sys.exit(1)
 
 conf = SparkConf().setAppName("Non Redundant Entity Matching")
