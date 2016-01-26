@@ -4,6 +4,7 @@ import sys
 from pyspark import SparkConf, SparkContext
 from pyspark.sql import HiveContext, Row, Window
 from pyspark.sql.functions import *
+from pyspark.sql.types import *
 
 if len(sys.argv) != 3:
 	
@@ -23,7 +24,7 @@ def attr_key(l):
 	"""
 	a = []
 	for attr in l[1:]:
-		a.append((attr, l[0]))
+		a.append(Row(attr=attr, obj=l[0]))
 	return a
 
 """
@@ -33,10 +34,8 @@ def attr_key(l):
 inRDD = sc.textFile(sys.argv[1])
 
 ##Generating attribute-object pair from each line
-pairRDD = inRDD.flatMap(lambda line: attr_key(line.split("\t")))
+aoPair = inRDD.flatMap(lambda line: attr_key(line.split("\t")))
 
-##Converting to Row objects
-aoPair = pairRDD.map(lambda (a, o): Row(attr=a, obj=o))
 
 ##Converting to Dataframe
 
@@ -51,7 +50,9 @@ aoPair = pairRDD.map(lambda (a, o): Row(attr=a, obj=o))
 	+----+---+
 """
 
-aoDF = sqlCtx.createDataFrame(aoPair)
+schema = StructType([StructField("attr", StringType(), True), StructField("obj", StringType(), True)])
+
+aoDF = sqlCtx.createDataFrame(aoPair, schema)
 
 #Window that moves over rows of same obj and sorted by attr
 
