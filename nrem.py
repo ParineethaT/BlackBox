@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-import sys
+import sys, os
 from pyspark import SparkConf, SparkContext
-from pyspark.sql import HiveContext, Row, Window
+from pyspark.sql import HiveContext, Window
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 
@@ -14,7 +14,8 @@ if len(sys.argv) != 3:
 	""")
 	sys.exit(1)
 
-
+#Parallelism
+partitions = 5
 conf = SparkConf().setAppName("Non Redundant Entity Matching")
 sc = SparkContext(conf=conf)
 sqlCtx = HiveContext(sc)
@@ -25,14 +26,14 @@ def attr_key(l):
 	"""
 	a = []
 	for attr in l[1:]:
-		a.append(Row(attr=attr, obj=l[0]))
+		a.append(attr, l[0])
 	return a
 
 """
 	Assuming input file(s) to be tsv, and first field to be object and rest of the fields as attributes 
 """
 #Read input
-inRDD = sc.textFile(sys.argv[1], 5)
+inRDD = sc.textFile(sys.argv[1], partitions)
 
 ##Generating attribute-object pair from each line
 aoPair = inRDD.flatMap(lambda line: attr_key(line.split("\t")))
@@ -99,7 +100,7 @@ memorize = aoDF.select("attr", "obj", lag("attr",1, None).over(window).alias("pr
 	 (3, (u'c', 1))]
 
 """
-mappedRDD = memorize.map(lambda row: (row.attr, (row.obj, row.prev)))
+mappedRDD = memorize.map(lambda row: (row.attr.encode('utf-8'), (row.obj.encode('uft-8'), row.prev.encode('uft-8'))))
 
 
 #Group by 'attr' and collect tuple(obj, prev) into lists
@@ -109,7 +110,7 @@ mappedRDD = memorize.map(lambda row: (row.attr, (row.obj, row.prev)))
 	 (3, [(u'a', 2), (u'b', 2), (u'c', 1)])]
 
 """
-groupedByAttr = mappedRDD.groupByKey(5).mapValues(list).cache()
+groupedByAttr = mappedRDD.groupByKey(partitions).mapValues(list).cache()
 
 ##Calling an action to materialize cache.
 
@@ -172,9 +173,9 @@ eliminatedPairs = groupedByAttr.mapValues(lambda x: elimated(x)).filter(lambda (
 
 ##Saving outputs
 
-matchedPairs.saveAsTextFile(sys.argv[2] + "/matched")
+matchedPairs.saveAsTextFile(os.path.join(sys.argv[2],"matched"))
 
-eliminatedPairs.saveAsTextFile(sys.argv[2] + "/eliminated")
+eliminatedPairs.saveAsTextFile(os.path.join(sys.argv[2],"eliminated"))
 
 sc.stop()
 
