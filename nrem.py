@@ -14,6 +14,7 @@ if len(sys.argv) != 3:
 	""")
 	sys.exit(1)
 
+
 conf = SparkConf().setAppName("Non Redundant Entity Matching")
 sc = SparkContext(conf=conf)
 sqlCtx = HiveContext(sc)
@@ -31,7 +32,7 @@ def attr_key(l):
 	Assuming input file(s) to be tsv, and first field to be object and rest of the fields as attributes 
 """
 #Read input
-inRDD = sc.textFile(sys.argv[1])
+inRDD = sc.textFile(sys.argv[1], 5)
 
 ##Generating attribute-object pair from each line
 aoPair = inRDD.flatMap(lambda line: attr_key(line.split("\t")))
@@ -108,7 +109,7 @@ mappedRDD = memorize.map(lambda row: (row.attr, (row.obj, row.prev)))
 	 (3, [(u'a', 2), (u'b', 2), (u'c', 1)])]
 
 """
-groupedByAttr = mappedRDD.groupByKey().mapValues(list).cache()
+groupedByAttr = mappedRDD.groupByKey(5).mapValues(list).cache()
 
 ##Calling an action to materialize cache.
 
@@ -173,7 +174,7 @@ eliminatedPairs = groupedByAttr.mapValues(lambda x: elimated(x)).filter(lambda (
 
 matchedPairs.saveAsTextFile(sys.argv[2] + "/matched")
 
-eliminatedPairs.saveAsTextFile(sys.argv[1] + "/eliminated")
+eliminatedPairs.saveAsTextFile(sys.argv[2] + "/eliminated")
 
 sc.stop()
 
