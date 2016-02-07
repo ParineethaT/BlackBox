@@ -34,7 +34,7 @@ def attr_key(l):
 inRDD = sc.textFile(sys.argv[1])
 
 ##Generating attribute-object pair from each line
-aoPair = inRDD.flatMap(lambda line: attr_key(line.split("\s+")))
+aoPair = inRDD.flatMap(lambda line: attr_key(line.split("\t")))
 
 
 ##Converting to Dataframe
