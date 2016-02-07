@@ -15,7 +15,9 @@ if len(sys.argv) != 3:
 	sys.exit(1)
 
 #Parallelism
-partitions = 5
+partitions = 1
+matched_output = os.path.join(sys.argv[2],"matched")
+eliminated_output = os.path.join(sys.argv[2], "eliminated")
 conf = SparkConf().setAppName("Non Redundant Entity Matching")
 sc = SparkContext(conf=conf)
 sqlCtx = HiveContext(sc)
@@ -26,7 +28,7 @@ def attr_key(l):
 	"""
 	a = []
 	for attr in l[1:]:
-		a.append(attr, l[0])
+		a.append((attr, l[0]))
 	return a
 
 """
@@ -100,7 +102,7 @@ memorize = aoDF.select("attr", "obj", lag("attr",1, None).over(window).alias("pr
 	 (3, (u'c', 1))]
 
 """
-mappedRDD = memorize.map(lambda row: (row.attr.encode('utf-8'), (row.obj.encode('uft-8'), row.prev.encode('uft-8'))))
+mappedRDD = memorize.map(lambda row: (row.attr.encode('utf-8'), (row.obj, row.prev)))
 
 
 #Group by 'attr' and collect tuple(obj, prev) into lists
@@ -110,12 +112,10 @@ mappedRDD = memorize.map(lambda row: (row.attr.encode('utf-8'), (row.obj.encode(
 	 (3, [(u'a', 2), (u'b', 2), (u'c', 1)])]
 
 """
-groupedByAttr = mappedRDD.groupByKey(partitions).mapValues(list).cache()
+groupedByAttr = mappedRDD.groupByKey(partitions).mapValues(list)
 
-##Calling an action to materialize cache.
-
-groupedByAttr.take(5)
-
+groupedByAttr.cache()
+print("Total Attributes: "+ str(groupedByAttr.count()))
 ##Function to collect matched and eliminated pairs
 
 def pairFilter(elim=False):
@@ -131,7 +131,7 @@ def pairFilter(elim=False):
 				#Case for matching
 				if obj_o != obj_i and ((prev_o != prev_i) or (not prev_i and not prev_o)):
 					#No duplicates
-					s.add("-".join(sorted([obj_o, obj_i])))
+					s.add("-".join(sorted([obj_o, obj_i])).encode('utf-8'))
 		return s
 
 	def eliminatedPair(l):
@@ -139,7 +139,7 @@ def pairFilter(elim=False):
 		for obj_o, prev_o in l:
 			for obj_i, prev_i in l:
 				if obj_o != obj_i and ((prev_o == prev_i) and (prev_o and prev_i)):
-					s.add("-".join(sorted([obj_o, obj_i])))
+					s.add("-".join(sorted([obj_o, obj_i])).encode('utf-8'))
 		return s
 
 	"""
@@ -162,20 +162,23 @@ eliminated = pairFilter(elim=True)
 	[(1, {u'a-b', u'a-c', u'b-c'}), (3, {u'a-c', u'b-c'})]
 """
 ##Filter to eliminate empty sets
+
 matchedPairs = groupedByAttr.mapValues(lambda x: matched(x)).filter(lambda (x, y): True if len(y) else False)
+
+
 #RDD with all the eliminated pairs
 """
 	****  'a' and 'b' both had common previous attributes ****
 	[(2, {u'a-b'}), (3, {u'a-b'})]
 """
 ##Filter to eliminate empty sets
-eliminatedPairs = groupedByAttr.mapValues(lambda x: elimated(x)).filter(lambda (x, y): True if len(y) else False)
+eliminatedPairs = groupedByAttr.mapValues(lambda x: eliminated(x)).filter(lambda (x, y): True if len(y) else False)
 
 ##Saving outputs
 
-matchedPairs.saveAsTextFile(os.path.join(sys.argv[2],"matched"))
+matchedPairs.saveAsTextFile(matched_output)
 
-eliminatedPairs.saveAsTextFile(os.path.join(sys.argv[2],"eliminated"))
+eliminatedPairs.saveAsTextFile(eliminated_output)
 
 sc.stop()
 
