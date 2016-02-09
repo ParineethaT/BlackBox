@@ -16,8 +16,10 @@ if len(sys.argv) != 3:
 
 #Parallelism
 partitions = 1
+#Output Directories
 matched_output = os.path.join(sys.argv[2],"matched")
 eliminated_output = os.path.join(sys.argv[2], "eliminated")
+
 conf = SparkConf().setAppName("Non Redundant Entity Matching")
 sc = SparkContext(conf=conf)
 sqlCtx = HiveContext(sc)
@@ -36,6 +38,10 @@ def attr_key(l):
 """
 #Read input
 inRDD = sc.textFile(sys.argv[1], partitions)
+#If RDD is empty. Raise error and exit.
+if inRDD.isEmpty():
+	raise IOError("Input Directory/File is empty.")
+	sys.exit(2)
 
 ##Generating attribute-object pair from each line
 aoPair = inRDD.flatMap(lambda line: attr_key(line.split("\t")))
