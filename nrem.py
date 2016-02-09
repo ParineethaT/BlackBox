@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from py4j.java_gateway import Py4JJavaError
+
 import sys, os
 from pyspark import SparkConf, SparkContext
 from pyspark.sql import HiveContext, Window
@@ -40,7 +42,7 @@ def attr_key(l):
 inRDD = sc.textFile(sys.argv[1], partitions)
 #If RDD is empty. Raise error and exit.
 if inRDD.isEmpty():
-	raise IOError("Input Directory/File is empty.")
+	raise Py4JJavaError("Input Directory/File is empty.")
 	sys.exit(2)
 
 ##Generating attribute-object pair from each line
